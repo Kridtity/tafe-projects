@@ -5,6 +5,11 @@
 # The /w switch specifies timeout length in milliseconds (how to long to wait for echo response before aborting)
 import os
 
-ip = input("Target IP: ")
-n = input("Number of Packets: ")
-os.system(rf"ping {ip} /t /l 65500 /n {n} /w 1")
+# Use loopback address if destination not specified"
+ip = input("Target IP: ") or "127.0.0.1"
+# Use max 10 packets if number of packets not specified
+n = input("Number of Packets: ") or "10"
+# Use 3 seconds timeout period if timeout duration not specified
+w = input("Timeout (ms): ") or "3000"
+
+os.system(rf"ping {ip} /t /l 65500 /n {n} /w {w}")
