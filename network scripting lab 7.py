@@ -1,4 +1,4 @@
-"""# Copy program to correct errors and determine function
+# Copy program to correct errors and determine function
 a = 0
 b = 5
 
@@ -93,7 +93,7 @@ def roman_to_dec(roman):
     print("Decimal equivalent: " + str(dec))
 
 
-main()"""
+main()
 
 
 # Find match in string using recursion
