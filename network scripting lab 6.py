@@ -1,4 +1,4 @@
-"""# Compute volume of two cubes
+# Compute volume of two cubes
 def main():
     for i in range(2):
         total_volume = 0
@@ -47,7 +47,7 @@ def middle(string):
         return string[len(string) // 2]
 
 
-print(middle(input("Enter string: ")))"""
+print(middle(input("Enter string: ")))
 
 
 # Volume functions
@@ -83,5 +83,5 @@ def coneSurface(r, h):
     return sa
 
 
-# Coffe making instructions
+# Coffee making instructions
 # CBB doing so I'll leave it
