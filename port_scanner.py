@@ -104,10 +104,14 @@ dports = [21, 22, 23, 25, 53, 80, 110, 135, 137, 138, 139, 443, 1433, 1434, 8080
 cmd_input = sys.argv
 
 # Clean IP input and set destination IPs from cmd_input
-dips = list(sys.argv[1].replace(" ", "").split(","))
+# Rudimentary check if arg one in cmd input is a quote mark to see if command contains IPs
+if sys.argv[1] == '"':
+    dips = list(sys.argv[1].replace(" ", "").split(","))
+else:
+    dips = None
 
 # Change switch states according to cmd_input
-if ("-h" or "--help") in cmd_input:
+if ("?" or "-h" or "--help") in cmd_input:
     help = True
 if ("-v" or "--verbose") in cmd_input:
     verbosity = 1
@@ -126,92 +130,102 @@ closed_port_results = []
 filtered_port_results = []
 errors = []
 
-# Print help info if true
-if help:
-    print(help_message)
-
 # Print program version if true
 if "--version" in cmd_input:
     print("Version {version}")
 
-# Print scanning notification to console
-print("Scanning...")
+# Print help info if true
+if help:
+    print(help_message)
 
-# Disable scapy outputs
-if verbosity == 0:
-    # Save object sys.stdout to variable as backup
-    old_stdout = sys.stdout
-    # Replace sys.stdout with nonexistent object to prevent scapy outputs
-    sys.stdout = open(os.devnull, "w")
+# Proceed with scan only if IPs list is not empty
+if dips != None:
+    # Print scanning notification to console
+    print("Scanning...")
 
-# Run port scan
-for ip in dips:
-    for port in dports:
-        pac = IP(dst=ip) / TCP(sport=RandShort(), dport=port, flags="S")
-        response = sr1(pac, timeout=1.0, retry=1, verbose=verbosity)
-        print(response)
+    # Disable scapy outputs
+    if verbosity == 0:
+        # Save object sys.stdout to variable as backup
+        old_stdout = sys.stdout
+        # Replace sys.stdout with nonexistent object to prevent scapy outputs
+        sys.stdout = open(os.devnull, "w")
 
-        # Configure outputs for port scan
-        # If open port response
-        if (response == None) or (response == "None: Filtered"):
-            # If verbose, print real-time output
-            if verbosity == 1:
-                print(
+    # Run port scan
+    for ip in dips:
+        for port in dports:
+            pac = IP(dst=ip) / TCP(sport=RandShort(), dport=port, flags="S")
+            response = sr1(pac, timeout=1.0, retry=1, verbose=verbosity)
+            print(response)
+
+            # Configure outputs for port scan
+            # If open port response
+            if (response == None) or (response == "None: Filtered"):
+                # If verbose, print real-time output
+                if verbosity == 1:
+                    print(
+                        "Port {} for host {} filtered.".format(
+                            pac[TCP].dport, pac[IP].dst
+                        )
+                    )
+
+                # Append port filtered results to filtered_port_results
+                filtered_port_results.append(
                     "Port {} for host {} filtered.".format(pac[TCP].dport, pac[IP].dst)
                 )
 
-            # Append port filtered results to filtered_port_results
-            filtered_port_results.append(
-                "Port {} for host {} filtered.".format(pac[TCP].dport, pac[IP].dst)
-            )
+                # Check if firewall/ACL/router block etc.
+                if pac.haslayer(ICMP):
+                    # If verbose, print real-time output
+                    if verbosity == 1:
+                        print("Packet likely dropped by firewall/ACL/router etc.")
 
-            # Check if firewall/ACL/router block etc.
-            if pac.haslayer(ICMP):
+                    # Append notice into filtered_port_results
+                    filtered_port_results.append(
+                        "Packet likely dropped by firewall/ACL/router etc."
+                    )
+            elif response[TCP].flags == "SA":
                 # If verbose, print real-time output
                 if verbosity == 1:
-                    print("Packet likely dropped by firewall/ACL/router etc.")
+                    print(
+                        "Port {} for host {} open.".format(pac[TCP].dport, pac[IP].dst)
+                    )
 
-                # Append notice into filtered_port_results
-                filtered_port_results.append(
-                    "Packet likely dropped by firewall/ACL/router etc."
+                # Append port open results to open_port_results
+                open_port_results.append(
+                    "Port {} for host {} open.".format(pac[TCP].dport, pac[IP].dst)
                 )
-        elif response[TCP].flags == "SA":
-            # If verbose, print real-time output
-            if verbosity == 1:
-                print("Port {} for host {} open.".format(pac[TCP].dport, pac[IP].dst))
+            elif (response[TCP].flags == "R") or (response[TCP].flags == "RA"):
+                # If verbose, print real-time output
+                if verbosity == 1:
+                    print(
+                        "Port {} for host {} closed.".format(
+                            pac[TCP].dport, pac[IP].dst
+                        )
+                    )
 
-            # Append port open results to open_port_results
-            open_port_results.append(
-                "Port {} for host {} open.".format(pac[TCP].dport, pac[IP].dst)
-            )
-        elif (response[TCP].flags == "R") or (response[TCP].flags == "RA"):
-            # If verbose, print real-time output
-            if verbosity == 1:
-                print("Port {} for host {} closed.".format(pac[TCP].dport, pac[IP].dst))
+                # Append port closed results to closed_port_results
+                closed_port_results.append(
+                    "Port {} for host {} closed.".format(pac[TCP].dport, pac[IP].dst)
+                )
+            else:
+                # If verbose, print real-time output
+                if verbosity == 1:
+                    print(
+                        "Encountered error for port {} for host {}.".format(
+                            pac[TCP].dport, pac[IP].dst
+                        )
+                    )
 
-            # Append port closed results to closed_port_results
-            closed_port_results.append(
-                "Port {} for host {} closed.".format(pac[TCP].dport, pac[IP].dst)
-            )
-        else:
-            # If verbose, print real-time output
-            if verbosity == 1:
-                print(
+                # Append error to errors
+                errors.append(
                     "Encountered error for port {} for host {}.".format(
                         pac[TCP].dport, pac[IP].dst
                     )
                 )
 
-            # Append error to errors
-            errors.append(
-                "Encountered error for port {} for host {}.".format(
-                    pac[TCP].dport, pac[IP].dst
-                )
-            )
-
-# Retore sys.stdout for our own outputs
-if (verbosity == 0) and (sys.stdout != old_stdout):
-    sys.stdout = old_stdout
+    # Restore sys.stdout for our own outputs
+    if (verbosity == 0) and (sys.stdout != old_stdout):
+        sys.stdout = old_stdout
 
 # Print scan results
 if closed_ports:
